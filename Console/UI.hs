@@ -1,3 +1,5 @@
+-- Console UI utilities
+
 module Ren.Console.UI
     ( runMenu
     , printBar
@@ -5,11 +7,11 @@ module Ren.Console.UI
     , printDividerOf
     , Menu
     , MenuItem
+    , MenuOptions(..)
     ) where
 
--- Console UI utilities
-
 import System.IO
+import Data.Foldable (fold)
 
 import System.Console.ANSI
 import System.Console.Terminal.Size
@@ -17,43 +19,53 @@ import System.Console.Terminal.Size
 import Ren.Utils as U
 import Ren.Console.Base
 
+-- public api
+
 -- name, description, is available, return value
 type MenuItem a = (String, String, Bool, a)
 type Menu a = [MenuItem a]
 
-runMenu :: String -> Menu a -> IO a
-runMenu title items =
-    size >>= \sizeM ->
-        case sizeM of
-            Just win -> printMenuOf (width win) title items
-            Nothing -> printMenuOf defWinSize title items
+data MenuOptions a = MenuOptions
+    { mTitle :: String
+    , mItems :: Menu a
+    , mSize :: Int
+    }
 
-printBar :: Int -> Int -> Int -> Int -> IO ()
-printBar size minv maxv curv =
-    let ratio = (fromIntegral curv) / (fromIntegral $ maxv - minv)
-        bars = round (ratio * fromIntegral size)
-        left = size - bars
-    in
-        putStrLn ("[" ++ (replicate bars '|') ++ (replicate left '.') ++ "]")
+runMenu :: MenuOptions a -> IO a
+runMenu options =
+    getWidth options >>=
+    printMenuOf (mTitle options)
+                (mItems options)
 
-printDivider :: IO ()
-printDivider =
-    size >>= \sizeM ->
-        case sizeM of
-            Just win -> printDividerOf (width win)
-            Nothing -> printDividerOf defWinSize
+printBar :: Int -> Int -> IO ()
+printBar curv maxv =
+    putStrLn (
+        "[" ++
+        (replicate curv '|') ++
+        (replicate (maxv - curv) '.') ++
+        "]"
+    )
+
+printDivider :: MenuOptions a -> IO ()
+printDivider options =
+    getWidth options >>=
+    printDividerOf
 
 printDividerOf :: Int -> IO ()
 printDividerOf x =
-    putStr $ foldl (++) "" (replicate x "-")
+    putStr $ fold (replicate x "-")
 
--- Helpers
+-- private
 
-defWinSize :: Int
-defWinSize = 30
+getWidth :: MenuOptions a -> IO Int
+getWidth options = do
+    winM <- size
+    return $ case winM of
+        Just win -> width win
+        Nothing -> mSize options
 
-printMenuOf :: Int -> String -> Menu a -> IO a
-printMenuOf x title items =
+printMenuOf :: String -> Menu a -> Int -> IO a
+printMenuOf title items x =
     printDividerOf x >>
     putStrLn ("| " ++ title ++ ":") >>
     printDividerOf x >>
@@ -63,31 +75,34 @@ printMenuOf x title items =
 
 requestItem :: Menu a -> IO a
 requestItem items =
-    let processInput str =
-            case U.tryRead str of
-                Just idx ->
-                    case U.tryIdx idx items of
-                        Just (_, _, isAvailable, item) ->
-                            if isAvailable
-                                then return item
-                                else putStrLn ("Option " ++ str ++ " is not available") >>
-                                    requestItem items
-                        Nothing ->
-                            putStrLn ("Index should be between 0 and " ++ show (length items - 1)) >>
-                            requestItem items
-                Nothing ->
-                    putStrLn ("Input is not an integer: " ++ str) >>
-                    requestItem items
-    in
-        prompt ":> " >>= processInput
+    prompt ":> " >>= processInput where
+    processInput str =
+        case U.tryRead str of
+            Just idx -> tryGetItem str idx items
+            Nothing ->
+                putStrLn ("Input is not an integer: " ++ str) >>
+                requestItem items
+
+tryGetItem :: String -> Int -> Menu a -> IO a
+tryGetItem str idx items =
+    case U.tryIdx idx items of
+        Just (_, _, isAvailable, item) ->
+            if isAvailable
+            then return item
+            else putStrLn ("Option " ++ str ++ " is not available") >>
+                 requestItem items
+        Nothing ->
+            putStrLn ("Index should be between 0 and " ++ show (length items - 1)) >>
+            requestItem items
 
 printOptions :: Menu a -> IO ()
 printOptions xs =
-    let showItem (name, description, isAvailable, _) idx =
-            (if isAvailable
-                then setSGR [SetColor Foreground Vivid White]
-                else setSGR [SetColor Foreground Vivid Black]) >>
-            putStrLn (show idx ++ ") " ++ name ++ if description == "" then "" else " (" ++ description ++ ")")
-    in
-        foldl (>>) (return ()) (U.mapi showItem xs) >>
-        setSGR [Reset]
+    foldl (>>) (return ()) (U.mapi showItem xs) >>
+    setSGR [Reset]
+
+showItem :: MenuItem a -> Int -> IO ()
+showItem (name, description, isAvailable, _) idx =
+    setSGR [SetColor Foreground Vivid color] >>
+    putStrLn (show idx ++ ") " ++ name ++ descr)
+    where descr = if description == "" then "" else " (" ++ description ++ ")"
+          color = if isAvailable then White else Black
