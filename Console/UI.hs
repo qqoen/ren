@@ -1,6 +1,8 @@
 module Ren.Console.UI
     ( runMenu
     , printBar
+    , printDivider
+    , printDividerOf
     , Menu
     , MenuItem
     ) where
@@ -24,7 +26,7 @@ runMenu title items =
     size >>= \sizeM ->
         case sizeM of
             Just win -> printMenuOf ((width win) - 1) title items
-            Nothing -> printMenuOf defDividerSize title items
+            Nothing -> printMenuOf defWinSize title items
 
 printBar :: Int -> Int -> Int -> Int -> IO ()
 printBar size minv maxv curv =
@@ -34,10 +36,21 @@ printBar size minv maxv curv =
     in
         putStrLn ("[" ++ (replicate bars '|') ++ (replicate left '.') ++ "]")
 
+printDivider :: IO ()
+printDivider =
+    size >>= \sizeM ->
+        case sizeM of
+            Just win -> printDividerOf (width win)
+            Nothing -> printDividerOf defWinSize
+
+printDividerOf :: Int -> IO ()
+printDividerOf x =
+    putStr $ foldl (++) "" (replicate x "-")
+
 -- Helpers
 
-defDividerSize :: Int
-defDividerSize = 30
+defWinSize :: Int
+defWinSize = 30
 
 printMenuOf :: Int -> String -> Menu a -> IO a
 printMenuOf x title items =
@@ -80,13 +93,4 @@ printOptions xs =
         foldl (>>) (return ()) (U.mapi showItem xs) >>
         setSGR [Reset]
 
-printDivider :: IO ()
-printDivider =
-    putStrLn getDivider
 
-printDividerOf :: Int -> IO ()
-printDividerOf x =
-    putStrLn $ foldl (++) "" (replicate x "-")
-
-getDivider :: String
-getDivider = foldl (++) "" (replicate 30 "-")
