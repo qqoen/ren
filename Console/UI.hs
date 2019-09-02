@@ -25,7 +25,7 @@ runMenu :: String -> Menu a -> IO a
 runMenu title items =
     size >>= \sizeM ->
         case sizeM of
-            Just win -> printMenuOf ((width win) - 1) title items
+            Just win -> printMenuOf (width win) title items
             Nothing -> printMenuOf defWinSize title items
 
 printBar :: Int -> Int -> Int -> Int -> IO ()
@@ -68,10 +68,9 @@ requestItem items =
                 Just idx ->
                     case U.tryIdx idx items of
                         Just (_, _, isAvailable, item) ->
-                            case isAvailable of
-                                True -> return item
-                                False ->
-                                    putStrLn ("Option " ++ str ++ " is not available") >>
+                            if isAvailable
+                                then return item
+                                else putStrLn ("Option " ++ str ++ " is not available") >>
                                     requestItem items
                         Nothing ->
                             putStrLn ("Index should be between 0 and " ++ show (length items - 1)) >>
@@ -92,5 +91,3 @@ printOptions xs =
     in
         foldl (>>) (return ()) (U.mapi showItem xs) >>
         setSGR [Reset]
-
-
