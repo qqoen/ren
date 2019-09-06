@@ -12,6 +12,7 @@ module Ren.Console.UI
 
 import System.IO
 import Data.Foldable (fold)
+import Control.Monad.Fix (fix)
 
 import System.Console.ANSI
 import System.Console.Terminal.Size
@@ -33,9 +34,9 @@ data MenuOptions a = MenuOptions
 
 runMenu :: MenuOptions a -> IO a
 runMenu options =
-    getWidth options >>=
     printMenuOf (mTitle options)
                 (mItems options)
+    =<< getWidth options
 
 printBar :: Int -> Int -> IO ()
 printBar curv maxv =
@@ -47,13 +48,12 @@ printBar curv maxv =
     )
 
 printDivider :: MenuOptions a -> IO ()
-printDivider options =
-    getWidth options >>=
-    printDividerOf
+printDivider =
+    (printDividerOf =<<) . getWidth
 
 printDividerOf :: Int -> IO ()
-printDividerOf x =
-    putStr $ fold (replicate x "-")
+printDividerOf =
+    putStr . fold . (flip replicate "-")
 
 -- private
 
@@ -74,26 +74,29 @@ printMenuOf title items x =
     requestItem items
 
 requestItem :: Menu a -> IO a
-requestItem items =
-    prompt ":> " >>= processInput where
-    processInput str =
-        case U.tryRead str of
-            Just idx -> tryGetItem str idx items
-            Nothing ->
-                putStrLn ("Input is not an integer: " ++ str) >>
-                requestItem items
+requestItem = fix $ \recfn items -> do
+    input <- prompt ":> "
 
-tryGetItem :: String -> Int -> Menu a -> IO a
-tryGetItem str idx items =
-    case U.tryIdx idx items of
-        Just (_, _, isAvailable, item) ->
-            if isAvailable
-            then return item
-            else putStrLn ("Option " ++ str ++ " is not available") >>
-                 requestItem items
+    case pickItem items input of
+        Right a -> return a
+        Left err ->
+            putStrLn err >>
+            recfn items
+
+pickItem :: Menu a -> String -> Either String a
+pickItem items str =
+    case U.tryRead str of
+        Just idx ->
+            case U.tryIdx idx items of
+                Just (_, _, isAvailable, item) ->
+                    if isAvailable
+                    then Right item
+                    else Left ("Option " ++ str ++ " is not available")
+
+                Nothing ->
+                    Left ("Index should be between 0 and " ++ show (length items - 1))
         Nothing ->
-            putStrLn ("Index should be between 0 and " ++ show (length items - 1)) >>
-            requestItem items
+            Left ("Input is not an integer: " ++ str)
 
 printOptions :: Menu a -> IO ()
 printOptions xs =

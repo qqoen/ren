@@ -4,15 +4,15 @@ module Ren.Utils
     , mapIndexes
     , mapi
     , remove
-    , quote
     ) where
+
+import Data.Tuple (uncurry)
 
 -- safe (!!)
 tryIdx :: Int -> [a] -> Maybe a
-tryIdx i xs =
-    if i >= length xs
-        then Nothing
-        else Just (xs !! i)
+tryIdx i xs
+    | i >= length xs = Nothing
+    | otherwise      = Just (xs !! i)
 
 -- safe read
 tryRead :: Read a => String -> Maybe a
@@ -21,19 +21,15 @@ tryRead s =
         [(val, "")] -> Just val
         _           -> Nothing
 
--- get list of elements+indexes
-mapIndexes :: [a] -> Int -> [(a, Int)]
-mapIndexes [] _ = []
-mapIndexes (x:xs) i = (x, i) : (mapIndexes xs (i + 1))
+-- assign and index to each item of a list, starting with provided value
+mapIndexes :: Int -> [a] -> [(a, Int)]
+mapIndexes _ []     = []
+mapIndexes i (x:xs) = (x, i) : (mapIndexes (i + 1) xs)
 
 -- map list with element index
 mapi :: (a -> Int -> b) -> [a] -> [b]
-mapi fn xs =
-    map (\(x, i) -> fn x i) (mapIndexes xs 0)
+mapi fn = map (uncurry fn) . (mapIndexes 0)
 
 -- remove elem from  a list
 remove :: Eq a => a -> [a] -> [a]
-remove x xs = filter (x /=) xs
-
-quote :: String -> String
-quote str = "\"" ++ str ++ "\""
+remove = filter . (/=)

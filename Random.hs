@@ -1,3 +1,5 @@
+{-# LANGUAGE TupleSections #-}
+
 module Ren.Random
     ( randomInt
     , randomChoice
@@ -19,7 +21,7 @@ data Dice = Dice Int Int Int
 -- bounds included
 -- work as expected with multiple io uses
 randomInt :: Int -> Int -> IO Int
-randomInt from to = getStdRandom $ randomR (from, to)
+randomInt from = (getStdRandom . randomR) . (from,)
 
 -- actually safe for whatever reason, so you can use it with empty lists
 randomChoice :: [a] -> IO a

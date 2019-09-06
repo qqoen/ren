@@ -14,5 +14,3 @@ get ln = getConst . ln Const
 
 set :: Lens s a -> (a -> s -> s)
 set ln x = runIdentity . ln (Identity . const x)
-
-

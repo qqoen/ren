@@ -9,7 +9,7 @@ module Ren.Json
 import Data.List
 
 str :: String -> String
-str x = "\"" ++ x ++ "\""
+str = show
 
 arr :: Show a => [a] -> String
 arr xs = "[" ++ content ++ "]"
